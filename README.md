@@ -20,4 +20,5 @@ How to run:
 
 
 Notes:  We used Docker instead of the VM for this assignment. Fiona Zara completed part 1
-        and pushed to github and then Brianna Huynh completed part 2 and debugged.
+        and pushed to github and then Brianna Huynh completed part 2 and debugged. Both
+        of us added to the DESIGNDOC for our respective parts.
