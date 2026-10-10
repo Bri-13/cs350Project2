@@ -52,7 +52,8 @@ struct context {
 };
 
 enum procstate { UNUSED, USED, ZOMBIE };                                // state of a dying process.
-enum threadstate { TUNUSED, TEMBRYO, TSLEEPING, TRUNNABLE, TRUNNING, TZOMBIE, TINVALID };
+enum threadstate { TUNUSED, TEMBRYO, TSLEEPING, TBLOCKED, TRUNNABLE, TRUNNING, TZOMBIE, TINVALID }; // Huynh
+enum mutexstate {MUNUSED, MLOCKED, MUNLOCKED}; // Huynh
 
 struct thread {
   int tid;                     // Thread ID
@@ -63,6 +64,12 @@ struct thread {
   struct context *context;     // swtch() here to run process
   void *chan;                  // If non-zero, sleeping on chan
   int killed;                  // If non-zero, have been killed
+};
+
+// Huynh
+struct kthread_mutex {
+  int mid;
+  enum mutexstate state;
 };
 
 // Per-process state

@@ -1,1 +1,12 @@
 Name the files you modified and briefly describe the changes to the xv6 code.
+
+kthread.h:      added function prototypes
+proc.h:         added TBLOCKED state, added mutex state enum, added struct for kthread_mutex
+proc.c:         added the mutex table, initialize mutex table, added mutexsleep function, modified wakeup1 and kill 
+                functions to include TBLOCKED state, implemented kthread_mutex_alloc, kthread_mutex_dealloc, 
+                kthread_mutex_lock, and kthread_mutex_unlock.
+defs.h:         added prototypes for kthread_mutex_alloc, kthread_mutex_dealloc, kthread_mutex_lock, and 
+                kthread_mutex_unlock.
+sysproc.c:      added system call wrappers for kthread_mutex_alloc, kthread_mutex_dealloc, kthread_mutex_lock,
+                and kthread_mutex_unlock.
+syscall.c:      added external declarations and system call table entries

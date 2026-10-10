@@ -117,6 +117,10 @@ void            wakeup(void*);
 void            yield(void);
 void 			killSelf(void);
 int             killOtherThreads(void);
+int             kthread_mutex_alloc(void);      // Huynh
+int             kthread_mutex_dealloc(int);     // Huynh
+int             kthread_mutex_lock(int);        // Huynh
+int             kthread_mutex_unlock(int);      // Huynh
 
 // swtch.S
 void            swtch(struct context**, struct context*);

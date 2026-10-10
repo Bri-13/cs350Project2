@@ -16,6 +16,12 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
+// Huynh
+struct {
+  struct spinlock lock;
+  struct kthread_mutex mutex[MAX_MUTEXES];
+} mtable;
+
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -26,10 +32,17 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
+// Huynh
 void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  initlock(&mtable.lock, "mtable");
+
+  for(int i=0; i<MAX_MUTEXES; i++){
+    mtable.mutex[i].mid = 0;
+    mtable.mutex[i].state = MUNUSED;
+  }
 }
 
 struct thread*
@@ -87,6 +100,28 @@ allocthread(struct proc * p)
   return t;
 }
 
+// Huynh
+int
+kthread_mutex_alloc(void)
+{
+  int mutex_id;
+  struct kthread_mutex *m;
+
+  acquire(&mtable.lock);
+  for(int i=0; i<MAX_MUTEXES; i++){
+    m = &mtable.mutex[i];
+    if(m->state == MUNUSED){
+      m->mid = nextmid++;
+      m->state = MUNLOCKED;
+      mutex_id = m->mid;
+      release(&mtable.lock);
+      return mutex_id;
+    }
+  }
+
+  release(&mtable.lock);
+  return -1;
+}
 
 
 //PAGEBREAK: 32
@@ -512,6 +547,34 @@ sleep(void *chan, struct spinlock *lk)
   }
 }
 
+// Huynh
+void
+mutexsleep(void *chan, struct spinlock *lk)
+{
+	
+  if(proc == 0 || thread == 0)
+    panic("mutexsleep");
+
+  if(lk == 0)
+    panic("mutexsleep without lk");
+
+  if(lk != &ptable.lock){ 
+    acquire(&ptable.lock);
+    release(lk);
+  }
+
+  thread->chan = chan;
+  thread->state = TBLOCKED;
+  sched();
+
+  thread->chan = 0;
+
+  if(lk != &ptable.lock){ 
+    release(&ptable.lock);
+    acquire(lk);
+  }
+}
+
 //PAGEBREAK!
 // Wake up all processes sleeping on chan.
 // The ptable lock must be held.
@@ -525,7 +588,7 @@ wakeup1(void *chan)
     if(p->state == USED)
     {
       for(t = p->threads; t < &p->threads[NTHREAD]; t++)
-        if(t->state == TSLEEPING && t->chan == chan)
+        if((t->state == TSLEEPING || t->state == TBLOCKED) && t->chan == chan)  // Huynh
           t->state = TRUNNABLE;
     }
 }
@@ -554,7 +617,7 @@ kill(int pid)
       p->killed = 1;
       // Wake process from sleep if necessary.
       for(t = p->threads; t < &p->threads[NTHREAD]; t++)
-        if(t->state == TSLEEPING)
+        if(t->state == TSLEEPING || t->state == TBLOCKED) // Huynh
           t->state = TRUNNABLE;
 
       release(&ptable.lock);
@@ -769,5 +832,102 @@ kthread_join(int thread_id)
   }
 
   release(&ptable.lock);
+  return 0;
+}
+
+// Huynh
+int 
+kthread_mutex_dealloc(int mutex_id)
+{
+  int i;
+  struct kthread_mutex *m;
+  
+  acquire(&mtable.lock);
+  for(i=0; i<MAX_MUTEXES; i++){
+    m = &mtable.mutex[i];
+    if(m->state != MUNUSED && m->mid == mutex_id){
+      break;
+    }
+  }
+
+  if(i == MAX_MUTEXES){
+    release(&mtable.lock);
+    return -1;
+  }
+
+  if(m->state == MLOCKED){
+    release(&mtable.lock);
+    return -1;
+  }
+
+  m->mid = 0;
+  m->state = MUNUSED;
+  release(&mtable.lock);
+  return 0;
+}
+
+// Huynh
+int 
+kthread_mutex_lock(int mutex_id)
+{
+  int i;
+  struct kthread_mutex *m;
+
+  acquire(&mtable.lock);
+  for(i=0; i<MAX_MUTEXES; i++){
+    m = &mtable.mutex[i];
+    if(m->state != MUNUSED && m->mid == mutex_id){
+      break;
+    }
+  }
+
+  if(i == MAX_MUTEXES){
+    release(&mtable.lock);
+    return -1;
+  }
+
+  while(m->state == MLOCKED){
+    mutexsleep(m, &mtable.lock);
+  }
+
+  if(m->state != MUNLOCKED){
+    release(&mtable.lock);
+    return -1;
+  }
+
+  m->state = MLOCKED;
+  release(&mtable.lock);
+  return 0;
+}
+
+// Huynh
+int 
+kthread_mutex_unlock(int mutex_id)
+{
+  int i;
+  struct kthread_mutex *m;
+
+  acquire(&mtable.lock);
+  for(i=0; i<MAX_MUTEXES; i++){
+    m = &mtable.mutex[i];
+    if(m->state != MUNUSED && m->mid == mutex_id){
+      break;
+    }
+  }
+  if(i == MAX_MUTEXES){
+    release(&mtable.lock);
+    return -1;
+  }
+
+  if(m->state != MLOCKED){
+    release(&mtable.lock);
+    return -1;
+  }
+
+  m->state = MUNLOCKED;
+  acquire(&ptable.lock);
+  wakeup1(m);
+  release(&ptable.lock);
+  release(&mtable.lock);
   return 0;
 }
