@@ -10,6 +10,8 @@
 int
 exec(char *path, char **argv)
 {
+  if(killOtherThreads<0)
+    killSelf;
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];

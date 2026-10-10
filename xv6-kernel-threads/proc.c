@@ -161,25 +161,33 @@ userinit(void)
 }
 
 // Grow current process's memory by n bytes.
-// Return 0 on success, -1 on failure.
+// Returns old size on success, -1 on failure.
+// this change is due to the information that sys_sbrk uses.
 int
 growproc(int n)
 {
   uint sz;
+  uint old_sz;
 
+  // adding necessary synchronization
+  acquire(&ptable.lock);
   sz = proc->sz;
+  old_sz = proc->sz;
   if(n > 0){
     if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0){
+      release(&ptable.lock);
       return -1;
     }
   } else if(n < 0){
     if((sz = deallocuvm(proc->pgdir, sz, sz + n)) == 0){
+      release(&ptable.lock);
       return -1;
     }
   }
   proc->sz = sz;
   switchuvm(proc);
-  return 0;
+  release(&ptable.lock);
+  return old_sz;
 }
 
 // Create a new process copying p as the parent.
@@ -240,6 +248,13 @@ fork(void)
 void
 exit(void)
 {
+  // Adding this to ensure that sibling threads are also killed
+  if(killOtherThreads()<0)
+  {
+    proc->killed=1;
+    killSelf();
+  }
+
   struct proc *p;
   int fd;
 
@@ -562,6 +577,50 @@ killSelf()
   sched();
 }
 
+// Adding another helper thread to kill other sibling processes
+int
+killOtherThreads()
+{
+  struct thread *temp_thread;
+
+  acquire(&ptable.lock);
+  if(thread->killed)
+  {
+    release (&ptable.lock);
+    return -1;
+  }
+  
+  for(int i=0; i<NTHREAD; i++)
+  {
+    temp_thread = &proc->threads[i];
+    if(temp_thread==thread || temp_thread->state==TUNUSED 
+        || temp_thread->state==TZOMBIE || temp_thread->state==TINVALID)
+      continue;
+    
+    // marks each of the other threads as killed (without actually killing them)
+    temp_thread->killed = 1;
+    // then forces all those threads to run if they have not done so already
+    if(temp_thread->state == TSLEEPING)
+      temp_thread->state = TRUNNABLE;
+  }
+
+  // this loop waits for each and every thread to run and then kills them
+  // also frees up space once done
+  for (int i=0; i<NTHREAD; i++)
+  {
+    temp_thread = &proc->threads[i];
+    if(temp_thread==thread) continue;
+    while(temp_thread->state!=TUNUSED && temp_thread->state !=TZOMBIE
+        && temp_thread->state!=TINVALID)
+      sleep(temp_thread, &ptable.lock);
+    if(temp_thread->state!=TUNUSED)
+      clearThread(temp_thread);
+  }
+
+  release(&ptable.lock);
+  return 0;
+}
+
 //PAGEBREAK: 36
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
@@ -603,4 +662,112 @@ procdump(void)
 
 
   }
+}
+
+// Adding code for Part 1, kthreads
+int 
+kthread_create(void*(*start_func)(), void* stack, int stack_size)
+{
+  struct thread *new_thread;
+
+  acquire(&ptable.lock);
+  
+  // essentially using allocthread func to get a slot for the new thread
+  // if it fails, it equals 0
+  // this is just a check to see if it was able to get the slot
+  new_thread = allocthread(proc);
+  if(new_thread == 0)
+  {
+    release(&ptable.lock);
+    return -1;
+  }
+
+  // copying over TF using the current thread
+  *new_thread->tf = *thread->tf;
+  // replacing eip & esp with arguments
+  new_thread->tf->eip = (uint) start_func;
+  new_thread->tf->esp = (uint) stack + stack_size;
+  new_thread->state = TRUNNABLE;
+  
+  // need to save this before we release the lock
+  int new_thread_tid = new_thread->tid;
+
+  release(&ptable.lock);
+  return new_thread_tid;
+}
+
+int 
+kthread_id()
+{
+  return thread->tid;
+}
+
+void 
+kthread_exit()
+{
+  struct thread *temp_thread;
+  int other_threads_flag = 0;
+
+  acquire(&ptable.lock);
+  for(int i=0; i<NTHREAD; i++)
+  {
+    temp_thread = &(proc->threads[i]);
+    if(temp_thread!=thread && temp_thread->state!=TUNUSED 
+          && temp_thread->state!=TZOMBIE && temp_thread->state!=TINVALID)
+          other_threads_flag = 1;
+  }
+
+  if(other_threads_flag)
+  {
+    // wakes one of the remaining thread as we end this one
+    wakeup1(thread);
+    thread->state = TZOMBIE;
+    // calls the scheduler thread, making this unreturnable
+    // keep the lock when calling it so that sched is guaranteed to run next
+    sched();
+  }
+
+  // simply exits as there are no other threads
+  release(&ptable.lock);
+  exit();
+}
+
+int 
+kthread_join(int thread_id)
+{
+  struct thread *temp_thread;
+  struct thread *target_thread = 0;
+
+  acquire(&ptable.lock);
+
+  // search for specified thread and making sure its unused
+  for(int i=0; i<NTHREAD; i++)
+  {
+    temp_thread = &(proc->threads[i]);
+    if(temp_thread->tid == thread_id && temp_thread->state !=TUNUSED)
+      target_thread = temp_thread;
+  }
+
+  // failed to find specified thread
+  if(target_thread==0 || target_thread==thread)
+  {
+    release(&ptable.lock);
+    return -1;
+  }
+
+  // forced to wait until specified thread it done
+  while(target_thread->tid==thread_id && target_thread->state!=TZOMBIE
+      && target_thread->state!=TINVALID)
+  {
+    // we somehow died before other thread's completion
+    if(thread->killed || proc->killed)
+    {
+      release(&ptable.lock);
+      return -1;
+    } 
+    sleep(target_thread, &ptable.lock);
+  }
+
+  release(&ptable.lock);
+  return 0;
 }
