@@ -116,6 +116,7 @@ int             wait(void);
 void            wakeup(void*);
 void            yield(void);
 void 			killSelf(void);
+int             killOtherThreads(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
