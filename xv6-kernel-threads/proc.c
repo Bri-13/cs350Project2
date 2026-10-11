@@ -198,6 +198,7 @@ userinit(void)
 // Grow current process's memory by n bytes.
 // Returns old size on success, -1 on failure.
 // this change is due to the information that sys_sbrk uses.
+// Zara
 int
 growproc(int n)
 {
@@ -284,6 +285,7 @@ void
 exit(void)
 {
   // Adding this to ensure that sibling threads are also killed
+  // Zara
   if(killOtherThreads()<0)
   {
     proc->killed=1;
@@ -641,6 +643,7 @@ killSelf()
 }
 
 // Adding another helper thread to kill other sibling processes
+// Zara
 int
 killOtherThreads()
 {
@@ -728,6 +731,7 @@ procdump(void)
 }
 
 // Adding code for Part 1, kthreads
+// Zara
 int 
 kthread_create(void*(*start_func)(), void* stack, int stack_size)
 {
@@ -759,12 +763,14 @@ kthread_create(void*(*start_func)(), void* stack, int stack_size)
   return new_thread_tid;
 }
 
+// Zara
 int 
 kthread_id()
 {
   return thread->tid;
 }
 
+// Zara
 void 
 kthread_exit()
 {
@@ -795,6 +801,7 @@ kthread_exit()
   exit();
 }
 
+// Zara
 int 
 kthread_join(int thread_id)
 {

@@ -10,6 +10,8 @@
 int
 exec(char *path, char **argv)
 {
+  // using helper func to ensure expected behavior
+  // Zara
   if(killOtherThreads<0)
     killSelf();
   char *s, *last;

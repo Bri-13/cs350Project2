@@ -1,6 +1,36 @@
 Name the files you modified and briefly describe the changes to the xv6 code.
 
-kthread.h:      added function prototypes
+Part 1
+kthread.h:      added function prototypes for kthread_create, kthread_id, kthread_exit, and kthread_join
+proc.c:         implemented functions kthread_create, kthread_id, kthread_exit, and kthread_join
+                added synchronization to growproc by adding a lock, also changed meaning of return value for 
+                sys_sbrk to remain functional
+                implemented new helper function killOtherThreads which marks all sibling threads as killed,
+                wakes each of them until all of them are killed, and then clears up their slots
+                added killOtherThreads in exit (to ensure that all sibling threads are killed as the process exits)
+defs.h:         added function prototype for new helper thread killOtherThreads
+exec.c:         used killOtherThreads in exec to ensure that all other sibling threads are killed for the new 
+                process
+sysproc.c:      added system call wrappers for kthread_create, kthread_id, kthread_exit, and kthread_join
+                modified sys_brk to accomodate the synchronization changes made to growproc in proc.c
+syscall.c:      added external declarations and system call table entries for the functions added to kthread.h
+
+Note on the synchronization: 
+                After looking at the fields in struct proc, the following seemed important to synchronize: sz, ofile[],
+                cwd, threads[]. I applied expected synchronization by adding locks to the kthread functions I added, 
+                and also by modifying exit and exec to use killOtherThreads. But also, I modified growproc to help 
+                synchronize sz -- which was not necessary but was a quick change. I did not bother to synchronize cwd 
+                and ofile[] because the scope of this assignment does not really touch this issue and would require 
+                modifications to more files.
+Note on growproc & sys_sbrk:
+                Because I had to add a lock to  growproc, there was now an issue where sys_sbrk would essentially 
+                access the old size before the lock is possessed in growproc. So I had to alter things a bit so that 
+                sys_sbrk received the old size from growproc after it did its functionality with the lock
+
+
+Part 2:
+kthread.h:      added function prototypes for kthread_mutex_alloc, kthread_mutex_dealloc, kthread_mutex_lock, 
+                and kthread_mutex_unlock
 proc.h:         added TBLOCKED state, added mutex state enum, added struct for kthread_mutex
 proc.c:         added the mutex table, initialize mutex table, added mutexsleep function, modified wakeup1 and kill 
                 functions to include TBLOCKED state, implemented kthread_mutex_alloc, kthread_mutex_dealloc, 
@@ -9,4 +39,4 @@ defs.h:         added prototypes for kthread_mutex_alloc, kthread_mutex_dealloc,
                 kthread_mutex_unlock.
 sysproc.c:      added system call wrappers for kthread_mutex_alloc, kthread_mutex_dealloc, kthread_mutex_lock,
                 and kthread_mutex_unlock.
-syscall.c:      added external declarations and system call table entries
+syscall.c:      added external declarations and system call table entries for the functions added to kthread.h

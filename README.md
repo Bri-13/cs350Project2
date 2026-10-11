@@ -13,7 +13,9 @@ How to compile:
 
 
 How to run:
-1. For part 1, ...
+1. For part 1:
+    - To run the first test, type in "threadtest1" and press enter.
+    - TO run the second test, type in "threadtest2" and press enter.
 2. For part 2:
     - To run the first test, type in "mutextest1" and press enter.
     - To run the second test, type in "mutextest2" and press enter.

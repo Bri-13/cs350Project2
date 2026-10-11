@@ -42,6 +42,9 @@ sys_getpid(void)
   return proc->pid;
 }
 
+// This function was modified due to 
+// modifications in growproc
+// Zara
 int
 sys_sbrk(void)
 {
@@ -50,14 +53,11 @@ sys_sbrk(void)
 
   if(argint(0, &n) < 0)
     return -1;
-  // addr = proc->sz;
-  // if(growproc(n) < 0)
-  //   return -1;
-  // return addr;
   
   // modified growproc to return old size
   // have to change the way we access the size 
   // as growproc is now synchronized
+  // Zara
   return growproc(n);
 }
 
@@ -102,7 +102,9 @@ sys_procdump(void)
   return 0;
 }
 
-int sys_kthread_create(void)
+// Zara
+int 
+sys_kthread_create(void)
 {
   int start; // an int holding address bits of the func
   int size;
@@ -114,18 +116,24 @@ int sys_kthread_create(void)
   return kthread_create((void*(*)())start, stack, size);
 }
 
-int sys_kthread_id(void)
+// Zara
+int 
+sys_kthread_id(void)
 {
   return kthread_id();
 }
 
-int sys_kthread_exit(void)
+// Zara
+int 
+sys_kthread_exit(void)
 {
   kthread_exit();
   return 0;
 }
 
-int sys_kthread_join(void)
+// Zara
+int 
+sys_kthread_join(void)
 {
   int tid;
   if(argint(0, &tid) < 0)

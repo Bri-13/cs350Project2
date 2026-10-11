@@ -116,7 +116,7 @@ int             wait(void);
 void            wakeup(void*);
 void            yield(void);
 void 			killSelf(void);
-int             killOtherThreads(void);
+int             killOtherThreads(void);         // Zara
 int             kthread_mutex_alloc(void);      // Huynh
 int             kthread_mutex_dealloc(int);     // Huynh
 int             kthread_mutex_lock(int);        // Huynh
